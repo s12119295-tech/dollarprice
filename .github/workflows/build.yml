@@ -8,7 +8,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -18,7 +19,9 @@ jobs:
       - name: Write project
         run: |
           set -e
-          mkdir -p proj/app/src/main/java/ir/dollar/pill proj/app/src/main/res/layout proj/app/src/main/res/drawable proj/app/src/main/res/xml
+          mkdir -p proj/app/src/main/java/ir/dollar/pill proj/app/src/main/res/layout proj/app/src/main/res/drawable proj/app/src/main/res/xml proj/app/src/main/assets
+          F=$(ls *.ttf 2>/dev/null | head -1 || true)
+          if [ -n "$F" ]; then cp "$F" proj/app/src/main/assets/font.ttf; else echo "no .ttf font in repo root"; fi
           cd proj
 
           cat > settings.gradle <<'EOF'
@@ -62,7 +65,8 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <application android:label="قرص دلار" android:icon="@drawable/ic_launcher">
-                  <activity android:name=".MainActivity" android:exported="true">
+                  <activity android:name=".MainActivity" android:exported="true"
+                      android:theme="@android:style/Theme.NoDisplay">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -81,73 +85,49 @@ jobs:
           cat > app/src/main/res/xml/widget_info.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-              android:minWidth="180dp"
-              android:minHeight="56dp"
-              android:targetCellWidth="3"
+              android:minWidth="250dp"
+              android:minHeight="40dp"
+              android:targetCellWidth="4"
               android:targetCellHeight="1"
               android:updatePeriodMillis="0"
-              android:resizeMode="horizontal"
+              android:resizeMode="horizontal|vertical"
               android:widgetCategory="home_screen"
               android:initialLayout="@layout/widget" />
           EOF
 
           cat > app/src/main/res/layout/widget.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="horizontal"
-              android:gravity="center_vertical"
-              android:layoutDirection="rtl"
-              android:background="@drawable/pill"
-              android:paddingStart="18dp"
-              android:paddingEnd="8dp"
-              android:paddingTop="6dp"
-              android:paddingBottom="6dp">
+              android:layout_height="match_parent">
 
-              <TextView
-                  android:id="@+id/label"
+              <LinearLayout
                   android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="دلار"
-                  android:textSize="13sp"
-                  android:textColor="#D9FFFFFF"
-                  android:shadowColor="#59000000"
-                  android:shadowRadius="6" />
+                  android:layout_height="40dp"
+                  android:layout_gravity="center"
+                  android:orientation="horizontal"
+                  android:gravity="center_vertical"
+                  android:layoutDirection="ltr"
+                  android:background="@drawable/pill"
+                  android:paddingStart="5dp"
+                  android:paddingEnd="16dp">
 
-              <TextView
-                  android:id="@+id/arrow"
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:paddingStart="8dp"
-                  android:textSize="12sp"
-                  android:textColor="#F2FFFFFF" />
+                  <ImageView
+                      android:id="@+id/refresh"
+                      android:layout_width="30dp"
+                      android:layout_height="30dp"
+                      android:layout_marginEnd="10dp"
+                      android:padding="6dp"
+                      android:background="@drawable/btn"
+                      android:contentDescription="ریفرش"
+                      android:src="@drawable/ic_refresh" />
 
-              <TextView
-                  android:id="@+id/price"
-                  android:layout_width="0dp"
-                  android:layout_height="wrap_content"
-                  android:layout_weight="1"
-                  android:gravity="center"
-                  android:maxLines="1"
-                  android:text="…"
-                  android:textDirection="ltr"
-                  android:textSize="22sp"
-                  android:textStyle="bold"
-                  android:textColor="#FFFFFF"
-                  android:shadowColor="#66000000"
-                  android:shadowDy="1"
-                  android:shadowRadius="8" />
-
-              <ImageView
-                  android:id="@+id/refresh"
-                  android:layout_width="36dp"
-                  android:layout_height="36dp"
-                  android:padding="8dp"
-                  android:background="@drawable/btn"
-                  android:contentDescription="ریفرش"
-                  android:src="@drawable/ic_refresh" />
-          </LinearLayout>
+                  <ImageView
+                      android:id="@+id/txt"
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content" />
+              </LinearLayout>
+          </FrameLayout>
           EOF
 
           cat > app/src/main/res/drawable/pill.xml <<'EOF'
@@ -189,21 +169,21 @@ jobs:
           package ir.dollar.pill;
 
           import android.app.Activity;
+          import android.content.ComponentName;
+          import android.content.pm.PackageManager;
           import android.os.Bundle;
-          import android.view.Gravity;
-          import android.view.View;
-          import android.widget.TextView;
+          import android.widget.Toast;
 
           public class MainActivity extends Activity {
               @Override protected void onCreate(Bundle b) {
                   super.onCreate(b);
-                  TextView t = new TextView(this);
-                  t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-                  t.setGravity(Gravity.CENTER);
-                  t.setTextSize(18);
-                  t.setPadding(48, 48, 48, 48);
-                  t.setText("قرص دلار نصب شد.\n\nصفحه اصلی را نگه دارید ← ویجت‌ها ← «قرص دلار» را روی صفحه بکشید.");
-                  setContentView(t);
+                  Toast.makeText(this, "ویجت «قرص دلار» را از لیست ویجت‌ها اضافه کنید", Toast.LENGTH_LONG).show();
+                  // آیکن برنامه بعد از اولین باز شدن از لانچر پنهان می‌شود؛ ویجت سر جایش می‌ماند
+                  getPackageManager().setComponentEnabledSetting(
+                          new ComponentName(this, MainActivity.class),
+                          PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                          PackageManager.DONT_KILL_APP);
+                  finish();
               }
           }
           EOF
@@ -212,6 +192,8 @@ jobs:
           package ir.dollar.pill;
 
           import android.app.PendingIntent;
+          import android.app.WallpaperColors;
+          import android.app.WallpaperManager;
           import android.appwidget.AppWidgetManager;
           import android.appwidget.AppWidgetProvider;
           import android.content.BroadcastReceiver;
@@ -219,6 +201,13 @@ jobs:
           import android.content.Context;
           import android.content.Intent;
           import android.content.SharedPreferences;
+          import android.graphics.Bitmap;
+          import android.graphics.Canvas;
+          import android.graphics.Color;
+          import android.graphics.Paint;
+          import android.graphics.Path;
+          import android.graphics.Typeface;
+          import android.os.Build;
           import android.widget.RemoteViews;
           import org.json.JSONObject;
           import java.io.BufferedReader;
@@ -250,8 +239,8 @@ jobs:
                           long cur = Math.round(fetch());
                           long prev = sp.getLong("last", 0);
                           String arr = sp.getString("arr", "");
-                          if (prev != 0 && cur > prev) arr = "▲";
-                          else if (prev != 0 && cur < prev) arr = "▼";
+                          if (prev != 0 && cur > prev) arr = "U";
+                          else if (prev != 0 && cur < prev) arr = "D";
                           String txt = fa(cur);
                           sp.edit().putLong("last", cur).putString("txt", txt).putString("arr", arr).apply();
                           render(c, txt, arr);
@@ -268,12 +257,80 @@ jobs:
                   int[] ids = m.getAppWidgetIds(new ComponentName(c, DollarWidget.class));
                   if (ids.length == 0) return;
                   RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget);
-                  v.setTextViewText(R.id.price, price);
-                  v.setTextViewText(R.id.arrow, arrow);
+                  int[] k = ink(c);
+                  v.setImageViewBitmap(R.id.txt, draw(c, price, arrow, k[0], k[1]));
+                  v.setInt(R.id.refresh, "setColorFilter", k[0]);
                   Intent in = new Intent(c, DollarWidget.class).setAction(REFRESH);
                   v.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(
                           c, 0, in, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
                   m.updateAppWidget(ids, v);
+              }
+
+              // متن با فونت assets/font.ttf روی بیت‌مپ کشیده می‌شود (ویجت فونت سفارشی را مستقیم قبول نمی‌کند)
+              static Bitmap draw(Context c, String price, String arrow, int fg, int sh) {
+                  float d = c.getResources().getDisplayMetrics().density;
+                  Typeface tf;
+                  try { tf = Typeface.createFromAsset(c.getAssets(), "font.ttf"); }
+                  catch (Exception e) { tf = Typeface.DEFAULT_BOLD; }
+                  Paint pp = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  pp.setTypeface(tf);
+                  pp.setColor(fg);
+                  pp.setTextSize(17 * d);
+                  pp.setShadowLayer(3 * d, 0, 1 * d, sh);
+                  Paint lp = new Paint(pp);
+                  lp.setTextSize(11 * d);
+                  lp.setColor((fg & 0x00FFFFFF) | 0xD9000000);
+                  String label = "دلار";
+                  float wp = pp.measureText(price), wl = lp.measureText(label);
+                  float tri = arrow.isEmpty() ? 0 : 7 * d, gap = 8 * d;
+                  float w = wp + gap + (tri > 0 ? tri + gap : 0) + wl;
+                  int H = (int) (30 * d), W = (int) Math.ceil(w + 4 * d);
+                  Bitmap b = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+                  Canvas cv = new Canvas(b);
+                  float x = 2 * d, cy = H / 2f;
+                  Paint.FontMetrics fm = pp.getFontMetrics();
+                  cv.drawText(price, x, cy - (fm.ascent + fm.descent) / 2f, pp);
+                  x += wp + gap;
+                  if (tri > 0) {
+                      Path p = new Path();
+                      if (arrow.equals("U")) {
+                          p.moveTo(x, cy + tri / 3); p.lineTo(x + tri, cy + tri / 3); p.lineTo(x + tri / 2, cy - tri * 2 / 3);
+                      } else {
+                          p.moveTo(x, cy - tri / 3); p.lineTo(x + tri, cy - tri / 3); p.lineTo(x + tri / 2, cy + tri * 2 / 3);
+                      }
+                      p.close();
+                      cv.drawPath(p, pp);
+                      x += tri + gap;
+                  }
+                  Paint.FontMetrics fl = lp.getFontMetrics();
+                  cv.drawText(label, x, cy - (fl.ascent + fl.descent) / 2f, lp);
+                  return b;
+              }
+
+              // رنگ متن از روی رنگ‌های والپیپر انتخاب می‌شود (اندروید ۸٫۱ به بالا؛ در نسخه‌های قدیمی‌تر سفید)
+              static int[] ink(Context c) {
+                  int fg = 0xFFFFFFFF, sh = 0x66000000;
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      try {
+                          WallpaperColors wc = WallpaperManager.getInstance(c).getWallpaperColors(WallpaperManager.FLAG_SYSTEM);
+                          if (wc != null) {
+                              int bg = wc.getPrimaryColor().toArgb();
+                              Color s = wc.getSecondaryColor() != null ? wc.getSecondaryColor() : wc.getTertiaryColor();
+                              int acc = s != null ? s.toArgb() : bg;
+                              float lum = (0.299f * Color.red(bg) + 0.587f * Color.green(bg) + 0.114f * Color.blue(bg)) / 255f;
+                              boolean light = lum > 0.55f;
+                              float[] hsv = new float[3];
+                              Color.colorToHSV(acc, hsv);
+                              if (hsv[1] >= 0.2f) {
+                                  hsv[1] = light ? Math.min(0.95f, Math.max(0.55f, hsv[1])) : Math.min(0.75f, Math.max(0.3f, hsv[1]));
+                              }
+                              hsv[2] = light ? 0.28f : 0.97f;
+                              fg = Color.HSVToColor(hsv);
+                              sh = light ? 0x55FFFFFF : 0x66000000;
+                          }
+                      } catch (Exception e) { }
+                  }
+                  return new int[]{fg, sh};
               }
 
               static double fetch() throws Exception {
