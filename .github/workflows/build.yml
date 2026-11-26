@@ -1,0 +1,316 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+      - name: Write project
+        run: |
+          set -e
+          mkdir -p proj/app/src/main/java/ir/dollar/pill proj/app/src/main/res/layout proj/app/src/main/res/drawable proj/app/src/main/res/xml
+          cd proj
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = 'DollarPill'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins { id 'com.android.application' version '8.5.2' apply false }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g
+          android.useAndroidX=false
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'ir.dollar.pill'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'ir.dollar.pill'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+                  encoding 'UTF-8'
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application android:label="قرص دلار" android:icon="@drawable/ic_launcher">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <receiver android:name=".DollarWidget" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+                  </receiver>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/xml/widget_info.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="180dp"
+              android:minHeight="56dp"
+              android:targetCellWidth="3"
+              android:targetCellHeight="1"
+              android:updatePeriodMillis="0"
+              android:resizeMode="horizontal"
+              android:widgetCategory="home_screen"
+              android:initialLayout="@layout/widget" />
+          EOF
+
+          cat > app/src/main/res/layout/widget.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="horizontal"
+              android:gravity="center_vertical"
+              android:layoutDirection="rtl"
+              android:background="@drawable/pill"
+              android:paddingStart="18dp"
+              android:paddingEnd="8dp"
+              android:paddingTop="6dp"
+              android:paddingBottom="6dp">
+
+              <TextView
+                  android:id="@+id/label"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="دلار"
+                  android:textSize="13sp"
+                  android:textColor="#D9FFFFFF"
+                  android:shadowColor="#59000000"
+                  android:shadowRadius="6" />
+
+              <TextView
+                  android:id="@+id/arrow"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:paddingStart="8dp"
+                  android:textSize="12sp"
+                  android:textColor="#F2FFFFFF" />
+
+              <TextView
+                  android:id="@+id/price"
+                  android:layout_width="0dp"
+                  android:layout_height="wrap_content"
+                  android:layout_weight="1"
+                  android:gravity="center"
+                  android:maxLines="1"
+                  android:text="…"
+                  android:textDirection="ltr"
+                  android:textSize="22sp"
+                  android:textStyle="bold"
+                  android:textColor="#FFFFFF"
+                  android:shadowColor="#66000000"
+                  android:shadowDy="1"
+                  android:shadowRadius="8" />
+
+              <ImageView
+                  android:id="@+id/refresh"
+                  android:layout_width="36dp"
+                  android:layout_height="36dp"
+                  android:padding="8dp"
+                  android:background="@drawable/btn"
+                  android:contentDescription="ریفرش"
+                  android:src="@drawable/ic_refresh" />
+          </LinearLayout>
+          EOF
+
+          cat > app/src/main/res/drawable/pill.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient android:angle="315" android:startColor="#59FFFFFF" android:endColor="#1AFFFFFF" />
+              <corners android:radius="60dp" />
+              <stroke android:width="1dp" android:color="#80FFFFFF" />
+          </shape>
+          EOF
+
+          cat > app/src/main/res/drawable/btn.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <solid android:color="#26FFFFFF" />
+              <stroke android:width="1dp" android:color="#80FFFFFF" />
+          </shape>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_refresh.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF"
+                  android:pathData="M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.73,0 6.84,-2.55 7.73,-6h-2.08c-0.82,2.33 -3.04,4 -5.65,4 -3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z" />
+          </vector>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+              <path android:fillColor="#0B4F52" android:pathData="M0,0h48v48h-48z" />
+              <path android:fillColor="#FFFFFF" android:pathData="M24,10a14,14 0 1,0 0,28a14,14 0 1,0 0,-28z" />
+          </vector>
+          EOF
+
+          cat > app/src/main/java/ir/dollar/pill/MainActivity.java <<'EOF'
+          package ir.dollar.pill;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.TextView;
+
+          public class MainActivity extends Activity {
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  TextView t = new TextView(this);
+                  t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+                  t.setGravity(Gravity.CENTER);
+                  t.setTextSize(18);
+                  t.setPadding(48, 48, 48, 48);
+                  t.setText("قرص دلار نصب شد.\n\nصفحه اصلی را نگه دارید ← ویجت‌ها ← «قرص دلار» را روی صفحه بکشید.");
+                  setContentView(t);
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/ir/dollar/pill/DollarWidget.java <<'EOF'
+          package ir.dollar.pill;
+
+          import android.app.PendingIntent;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.BroadcastReceiver;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.widget.RemoteViews;
+          import org.json.JSONObject;
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+
+          public class DollarWidget extends AppWidgetProvider {
+              static final String REFRESH = "ir.dollar.pill.REFRESH";
+              static final String API = "https://jeylgqlxmjumjfzzgbfa.supabase.co/functions/v1/dollar";
+              static final String KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpleWxncWx4bWp1bWpmenpnYmZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NTE0MTUsImV4cCI6MjExMTIyNzQxNX0.Z7xWXcxO9vwahvYtBpc3PZubZ9o8IZ5LEqmuVagpet4";
+
+              @Override public void onReceive(Context c, Intent i) {
+                  if (REFRESH.equals(i.getAction())) refresh(c, goAsync());
+                  else super.onReceive(c, i);
+              }
+
+              // یک‌بار هنگام اضافه شدن ویجت؛ بعد از آن فقط با دکمه ریفرش (updatePeriodMillis = 0)
+              @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
+                  refresh(c, goAsync());
+              }
+
+              static void refresh(final Context c, final BroadcastReceiver.PendingResult pr) {
+                  final SharedPreferences sp = c.getSharedPreferences("d", 0);
+                  render(c, sp.getString("txt", "…"), sp.getString("arr", ""));
+                  new Thread(() -> {
+                      try {
+                          long cur = Math.round(fetch());
+                          long prev = sp.getLong("last", 0);
+                          String arr = sp.getString("arr", "");
+                          if (prev != 0 && cur > prev) arr = "▲";
+                          else if (prev != 0 && cur < prev) arr = "▼";
+                          String txt = fa(cur);
+                          sp.edit().putLong("last", cur).putString("txt", txt).putString("arr", arr).apply();
+                          render(c, txt, arr);
+                      } catch (Exception e) {
+                          render(c, "اتصال نشد", "");
+                      } finally {
+                          if (pr != null) pr.finish();
+                      }
+                  }).start();
+              }
+
+              static void render(Context c, String price, String arrow) {
+                  AppWidgetManager m = AppWidgetManager.getInstance(c);
+                  int[] ids = m.getAppWidgetIds(new ComponentName(c, DollarWidget.class));
+                  if (ids.length == 0) return;
+                  RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget);
+                  v.setTextViewText(R.id.price, price);
+                  v.setTextViewText(R.id.arrow, arrow);
+                  Intent in = new Intent(c, DollarWidget.class).setAction(REFRESH);
+                  v.setOnClickPendingIntent(R.id.refresh, PendingIntent.getBroadcast(
+                          c, 0, in, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                  m.updateAppWidget(ids, v);
+              }
+
+              static double fetch() throws Exception {
+                  HttpURLConnection h = (HttpURLConnection) new URL(API).openConnection();
+                  h.setConnectTimeout(8000);
+                  h.setReadTimeout(8000);
+                  h.setRequestProperty("apikey", KEY);
+                  h.setRequestProperty("Authorization", "Bearer " + KEY);
+                  int code = h.getResponseCode();
+                  InputStream is = code >= 400 ? h.getErrorStream() : h.getInputStream();
+                  BufferedReader r = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+                  StringBuilder sb = new StringBuilder();
+                  String l;
+                  while ((l = r.readLine()) != null) sb.append(l);
+                  JSONObject j = new JSONObject(sb.toString());
+                  if (!j.optBoolean("ok")) throw new Exception("api");
+                  return j.getDouble("price");
+              }
+
+              static String fa(long n) {
+                  String s = Long.toString(n);
+                  StringBuilder b = new StringBuilder();
+                  for (int i = 0; i < s.length(); i++) {
+                      if (i > 0 && (s.length() - i) % 3 == 0) b.append('٬');
+                      b.append((char) ('۰' + (s.charAt(i) - '0')));
+                  }
+                  return b.toString();
+              }
+          }
+          EOF
+
+      - name: Build
+        run: cd proj && gradle assembleDebug --no-daemon
+      - name: Publish APK to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp proj/app/build/outputs/apk/debug/app-debug.apk DollarPill.apk
+          gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
+          gh release create latest DollarPill.apk --repo "$GITHUB_REPOSITORY" --title "Dollar Pill" --notes "APK ویجت قرص دلار"
